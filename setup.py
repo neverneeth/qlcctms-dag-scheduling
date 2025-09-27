@@ -14,7 +14,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 setup(
     name="dag-scheduling-framework",
     version="1.0.0",
-    author="Research Team",
+    author="Navaneeth V Sankar",
     description="A comprehensive framework for DAG scheduling algorithm experiments",
     long_description=long_description,
     long_description_content_type="text/markdown",
