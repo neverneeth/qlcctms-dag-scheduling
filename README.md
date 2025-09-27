@@ -1,6 +1,6 @@
 # DAG Scheduling Framework
 
-A comprehensive, modular framework for experimenting with DAG (Directed Acyclic Graph) scheduling algorithms in distributed computing systems.
+A comprehensive, modular framework for experimenting with DAG (Directed Acyclic Graph) scheduling using contention cognizant algorithms in distributed computing systems.
 
 ## Overview
 
