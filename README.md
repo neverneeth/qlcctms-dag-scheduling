@@ -190,6 +190,10 @@ ResultsVisualizer.plot_makespan_ratios(ratios_df)
 ```
 
 ## Installation and Dependencies
+### Easy Install
+```bash
+pip install -r requirements.txt
+```
 
 ### Required Dependencies
 ```bash
