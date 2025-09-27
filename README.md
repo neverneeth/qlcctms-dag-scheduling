@@ -4,7 +4,7 @@ A comprehensive, modular framework for experimenting with DAG (Directed Acyclic 
 
 ## Overview
 
-This framework implements the experimental setup described in the research paper for evaluating Communication-Conscious Task and Message Scheduling (CC-TMS) and Q-Learning based CC-TMS (QL-CC-TMS) algorithms.
+This framework implements the experimental setup described in the research paper for evaluating Contention Cognizant Task and Message Scheduling (CC-TMS) and Q-Learning based CC-TMS (QL-CC-TMS) algorithms.
 
 ## Framework Architecture
 
