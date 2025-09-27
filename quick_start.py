@@ -156,13 +156,13 @@ def demonstrate_framework():
         return True
         
     except ImportError as e:
-        print(f"✗ Import error: {e}")
+        print(f"Import error: {e}")
         print("\nPlease install required dependencies:")
         print("pip install networkx numpy matplotlib pandas seaborn")
         return False
         
     except Exception as e:
-        print(f"✗ Error during demonstration: {e}")
+        print(f"Error during demonstration: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -171,7 +171,7 @@ def demonstrate_framework():
 if __name__ == "__main__":
     success = demonstrate_framework()
     if success:
-        print("\n🎉 Framework is ready to use!")
+        print("\nFramework is ready to use!")
     else:
-        print("\n❌ Please resolve the issues above before using the framework.")
+        print("\nPlease resolve the issues above before using the framework.")
         sys.exit(1)
