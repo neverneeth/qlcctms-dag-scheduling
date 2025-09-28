@@ -27,48 +27,6 @@ dag_scheduling_framework/
 └── results/                      # Generated results and plots
 ```
 
-## Major Changes from Original Code
-
-### 1. **Modular Architecture**
-- **Before**: Single monolithic file with all functionality
-- **After**: Separated into focused modules with clear responsibilities
-- **Benefit**: Easier maintenance, testing, and extension
-
-### 2. **Object-Oriented Design**
-- **Before**: Procedural functions with global variables
-- **After**: Abstract base classes and factory patterns
-- **Benefit**: Extensible design for adding new DAG types and algorithms
-
-### 3. **Configuration Management**
-- **Before**: Hardcoded parameters throughout the code
-- **After**: Centralized configuration system with predefined experiment setups
-- **Benefit**: Easy parameter adjustment and experiment replication
-
-### 4. **Experiment Orchestration**
-- **Before**: Manual execution with individual function calls
-- **After**: Automated experiment runner with progress tracking and result management
-- **Benefit**: Scalable experiment execution with thousands of runs
-
-### 5. **Results Management**
-- **Before**: Print statements with no persistent storage
-- **After**: Structured data collection with CSV export and statistical analysis
-- **Benefit**: Reproducible results and comprehensive analysis capabilities
-
-### 6. **Visualization System**
-- **Before**: Basic matplotlib plots mixed with algorithm code
-- **After**: Dedicated visualization module with multiple plot types
-- **Benefit**: Professional publication-ready visualizations
-
-### 7. **Reproducibility Enhancements**
-- **Before**: Partial random state management
-- **After**: Complete random state control across all components
-- **Benefit**: Reproducible experiments across different runs
-
-### 8. **Performance Tracking**
-- **Before**: No execution time measurement
-- **After**: Detailed performance metrics including algorithm execution time
-- **Benefit**: Algorithm efficiency comparison
-
 ## Benchmark DAG Implementations
 
 The framework implements four benchmark DAG types exactly as specified in the research paper:
