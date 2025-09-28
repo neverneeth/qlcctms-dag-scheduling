@@ -1,22 +1,4 @@
-"""
-Absolute Makespan Comparison Experiment
-
-This experiment aims to compare the absolute makespan values obtained by the CC-TMS and QL-CC-TMS algorithms 
-For all four DAG configurations with a set of parameters (Gaussian Elimination with χ={3, 4, 5, 6}, Epigenomics with γ={2, 3, 4, 5}, 
-Laplace with φ={2, 3, 4, 5}, Stencil with ξ={2, 3, 4, 5}) across various platform settings, p = {2, 4, 6, 8}
-and b = {1, 2, 3, 4} and constant CCR = 1.0. 
-
-The results are saved to a CSV file for further analysis.
-
-The experiment runs 100 iterations for each configuration to ensure statistical significance.
-
-The experiment generates 128 box plots organized as:
-- Constant processors, varying buses (64 plots)
-- Constant buses, varying processors (64 plots)
-The Y axis represents the absolute makespan values for the CC-TMS and QL-CC-TMS algorithms.
-
-Date: September 2025
-"""
+""" Sanity check for ABS MAKESPAN COMPARISON EXPERIMENT """
 
 import os
 import sys
@@ -28,6 +10,7 @@ import seaborn as sns
 from itertools import product
 from collections import defaultdict
 import json
+from scipy import stats
 
 # Add the parent directory to the path to import framework modules
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -58,20 +41,17 @@ class AbsoluteMakespanComparator:
             iterations (int): Number of iterations per configuration
         """
         self.results_dir = results_dir
-        self.iterations = iterations
+        self.iterations = 200  # Reduced for quicker testing
         self.ccr = 1.0 
         
         # Experiment parameters as specified in the requirements
         self.dag_configs = {
-            'gaussian_elimination': [3, 4, 5, 6],      # χ values
-            'epigenomics': [2, 3, 4, 5],               # γ values  
-            'laplace': [2, 3, 4, 5],                   # φ values
-            'stencil': [2, 3, 4, 5]                    # ξ values (using ξ for width, λ for height)
+            'gaussian_elimination': [3, 4]      # χ values
         }
         
         # Platform configurations
-        self.processors = [2, 4, 6, 8]                 # p values
-        self.buses = [1, 2, 3, 4]                      # b values
+        self.processors = [2, 4]                 # p values
+        self.buses = [1, 2]                     # b values
         
         # Algorithms to compare
         self.algorithms = ['cctms', 'qlcctms']
