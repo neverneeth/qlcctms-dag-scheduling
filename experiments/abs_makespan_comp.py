@@ -1,7 +1,18 @@
 """
 Absolute Makespan Comparison Experiment
 
-This experiment aims to compare the absolute makespan values obtained by the CC-TMS and QL-CC-TMS algorithms 
+This experiment aims t        # Experiment parameters using centralized configuration
+        self.dag_configs = ExperimentConfig.FULL_DAG_CONFIGS.copy()
+        
+        # Platform configurations
+        self.processors = ExperimentConfig.FULL_PROCESSORS.copy()
+        self.buses = ExperimentConfig.FULL_BUSES.copy()
+        
+        # Algorithms to compare
+        self.algorithms = [Algorithms.CCTMS, Algorithms.QLCCTMS]
+        
+        # Q-learning parameters
+        self.ql_params = DEFAULT_QL_PARAMS.copy()absolute makespan values obtained by the CC-TMS and QL-CC-TMS algorithms 
 For all four DAG configurations with a set of parameters (Gaussian Elimination with χ={3, 4, 5, 6}, Epigenomics with γ={2, 3, 4, 5}, 
 Laplace with φ={2, 3, 4, 5}, Stencil with ξ={2, 3, 4, 5}) across various platform settings, p = {2, 4, 6, 8}
 and b = {1, 2, 3, 4} and constant CCR = 1.0. 
@@ -28,13 +39,20 @@ import seaborn as sns
 from itertools import product
 from collections import defaultdict
 import json
+from scipy import stats
 
 # Add the parent directory to the path to import framework modules
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
+# Import centralized configuration
+from config.constants import (
+    DAGTypes, Algorithms, DEFAULT_QL_PARAMS, ExperimentConfig,
+    PlotConfig, FileConfig, ProgressConfig
+)
+
 from src.dag_generators import DAGFactory
 from src.schedulers import SchedulerFactory
-from src.cost_matrices import CostMatrixGenerator
+from src.cost_matrices import generate_cost_matrices
 from src.experiment_runner import ExperimentRunner, ExperimentConfig, ExperimentResult
 
 
@@ -61,20 +79,18 @@ class AbsoluteMakespanComparator:
         self.iterations = iterations
         self.ccr = 1.0 
         
-        # Experiment parameters as specified in the requirements
-        self.dag_configs = {
-            'gaussian_elimination': [3, 4, 5, 6],      # χ values
-            'epigenomics': [2, 3, 4, 5],               # γ values  
-            'laplace': [2, 3, 4, 5],                   # φ values
-            'stencil': [2, 3, 4, 5]                    # ξ values (using ξ for width, λ for height)
-        }
+        # Experiment parameters using centralized configuration
+        self.dag_configs = ExperimentConfig.FULL_DAG_CONFIGS.copy()
         
         # Platform configurations
-        self.processors = [2, 4, 6, 8]                 # p values
-        self.buses = [1, 2, 3, 4]                      # b values
+        self.processors = ExperimentConfig.FULL_PROCESSORS.copy()
+        self.buses = ExperimentConfig.FULL_BUSES.copy()
         
         # Algorithms to compare
-        self.algorithms = ['cctms', 'qlcctms']
+        self.algorithms = [Algorithms.CCTMS, Algorithms.QLCCTMS]
+        
+        # Q-learning parameters
+        self.ql_params = DEFAULT_QL_PARAMS.copy()
         
         # Create results directory if it doesn't exist
         os.makedirs(self.results_dir, exist_ok=True)
@@ -84,7 +100,14 @@ class AbsoluteMakespanComparator:
         print(f"Results directory: {self.results_dir}")
         print(f"Iterations per configuration: {self.iterations}")
         print(f"Total configurations: {self._calculate_total_configurations()}")
-    
+        # Calculate expected plots: 4 DAG types × 4 parameters × (4 processors + 4 buses) = 128 plots each
+        total_param_combinations = sum(len(params) for params in self.dag_configs.values())
+        expected_plots_per_type = total_param_combinations * (len(self.processors) + len(self.buses))
+        print(f"Expected plots per visualization type: {expected_plots_per_type}")
+        print(f"  - Box plots: {expected_plots_per_type} (QL-CC-TMS with CC-TMS reference)")
+        print(f"  - Line plots: {expected_plots_per_type} (both algorithms)")
+        print(f"  - Total plots: {expected_plots_per_type * 2}")
+        print(f"  - Only QL-CC-TMS plots generated (CC-TMS shown as reference lines)")    
     def _calculate_total_configurations(self):
         """Calculate the total number of experimental configurations."""
         total = 0
@@ -126,15 +149,15 @@ class AbsoluteMakespanComparator:
                 dag_generator = DAGFactory.create_generator(dag_type)
                 
                 # Set the appropriate parameter based on DAG type
-                if dag_type == 'gaussian_elimination':
+                if dag_type == 'gaussian':
                     dag, task_list, message_list = dag_generator.generate(chi=param_value)
                 elif dag_type == 'epigenomics':
                     dag, task_list, message_list = dag_generator.generate(gamma=param_value)
                 elif dag_type == 'laplace':
                     dag, task_list, message_list = dag_generator.generate(phi=param_value)
                 elif dag_type == 'stencil':
-                    # For stencil, use param_value for both width and height for simplicity
-                    dag, task_list, message_list = dag_generator.generate(lambda_val=param_value, xi=param_value)
+                    # For stencil, use param_value for xi (levels and tasks per level)
+                    dag, task_list, message_list = dag_generator.generate(xi=param_value)
                 
                 # Test across all platform configurations
                 for num_proc, num_bus in product(self.processors, self.buses):
@@ -142,19 +165,19 @@ class AbsoluteMakespanComparator:
                     print(f"    Platform: {platform_config}")
                     
                     # Generate cost matrices for current platform
-                    cost_gen = CostMatrixGenerator()
-                    ET, CT = cost_gen.generate_cost_matrices(
-                        len(task_list), len(message_list), 
-                        num_proc, num_bus, self.ccr
+                    ET, CT, TL, ML = generate_cost_matrices(
+                        dag,  # Pass the actual graph, not len(task_list)
+                        num_proc, num_bus, self.ccr,
+                        random_state=42  # Add random state for reproducibility
                     )
                     
                     # Test both algorithms
                     for algorithm in self.algorithms:
                         print(f"      Algorithm: {algorithm.upper()}")
                         
-                        # Create scheduler
-                        if algorithm == 'qlcctms':
-                            scheduler = SchedulerFactory.create_scheduler(algorithm, max_episodes=5000)
+                        # Create scheduler with centralized parameters
+                        if algorithm == Algorithms.QLCCTMS:
+                            scheduler = SchedulerFactory.create_scheduler(algorithm, **self.ql_params)
                         else:
                             scheduler = SchedulerFactory.create_scheduler(algorithm)
                         
@@ -164,7 +187,7 @@ class AbsoluteMakespanComparator:
                             current_config += 1
                             
                             # Show progress
-                            if current_config % 100 == 0 or current_config == total_configs:
+                            if current_config % ProgressConfig.PROGRESS_INTERVAL_FULL == 0 or current_config == total_configs:
                                 progress = (current_config / total_configs) * 100
                                 print(f"        Progress: {current_config}/{total_configs} ({progress:.1f}%)")
                             
@@ -202,6 +225,8 @@ class AbsoluteMakespanComparator:
                                 
                             except Exception as e:
                                 print(f"        Error in iteration {iteration + 1}: {e}")
+                                import traceback
+                                traceback.print_exc()
                                 continue
                         
                         # Print summary statistics for this configuration
@@ -294,7 +319,223 @@ class AbsoluteMakespanComparator:
         sns.set_palette("husl")
         
         plot_count = 0
-        total_expected_plots = len(self.dag_configs) * 4 * (len(self.processors) + len(self.buses))
+        
+        expected_plots = len(list(self.dag_configs.values())[0]) * (len(self.processors) + len(self.buses))
+        
+        # Generate plots for each DAG type and parameter
+        for dag_type, param_values in self.dag_configs.items():
+            for param_value in param_values:
+                
+                # Filter data for current DAG configuration
+                dag_data = results_df[
+                    (results_df['dag_type'] == dag_type) & 
+                    (results_df['dag_parameter'] == param_value)
+                ]
+                
+                if dag_data.empty:
+                    print(f"Warning: No data for {dag_type} with parameter {param_value}")
+                    continue
+                
+                print(f"\nProcessing {dag_type} (parameter: {param_value})...")
+                
+                # 1. CONSTANT PROCESSORS, VARYING BUSES
+                for proc in self.processors:
+                    # Only create plots for QL-CC-TMS, but annotate with CC-TMS comparison
+                    plot_count += 1
+                    
+                    # Filter data for constant processor and QL-CC-TMS
+                    ql_proc_data = dag_data[
+                        (dag_data['num_processors'] == proc) & 
+                        (dag_data['algorithm'] == 'qlcctms')
+                    ]
+                    
+                    # Filter data for constant processor and CC-TMS (for comparison)
+                    cc_proc_data = dag_data[
+                        (dag_data['num_processors'] == proc) & 
+                        (dag_data['algorithm'] == 'cctms')
+                    ]
+                    
+                    if ql_proc_data.empty:
+                        print(f"  Warning: No QL-CC-TMS data for P{proc}")
+                        continue
+                    
+                    # Create figure
+                    fig, ax = plt.subplots(figsize=(12, 6))
+                    
+                    # Create box plot with buses on X-axis for QL-CC-TMS
+                    sns.boxplot(
+                        data=ql_proc_data, 
+                        x='num_buses', 
+                        y='makespan',
+                        ax=ax,
+                        color='lightcoral'
+                    )
+                    
+                    # Customize plot
+                    title = f"{dag_type.replace('_', ' ').title()} (Param: {param_value}) - {proc} Processors - QL-CC-TMS vs CC-TMS"
+                    ax.set_title(title, fontsize=14, fontweight='bold')
+                    ax.set_xlabel('Number of Buses', fontsize=12)
+                    ax.set_ylabel('Makespan (ms)', fontsize=12)
+                    
+                    # Add grid for better readability
+                    ax.grid(True, alpha=0.3)
+                    
+                    # Add QL-CC-TMS mean values and CC-TMS comparison
+                    for i, bus_val in enumerate(sorted(ql_proc_data['num_buses'].unique())):
+                        # QL-CC-TMS data
+                        ql_bus_data = ql_proc_data[ql_proc_data['num_buses'] == bus_val]['makespan']
+                        # CC-TMS data
+                        cc_bus_data = cc_proc_data[cc_proc_data['num_buses'] == bus_val]['makespan']
+                        
+                        if len(ql_bus_data) > 0:
+                            ql_mean = ql_bus_data.mean()
+                            ax.text(i, ql_mean, f'QL: {ql_mean:.1f}', 
+                                   ha='center', va='bottom', fontweight='bold', color='red')
+                            
+                            # Add CC-TMS comparison line and annotation
+                            if len(cc_bus_data) > 0:
+                                cc_mean = cc_bus_data.mean()
+                                # Draw horizontal line for CC-TMS makespan
+                                ax.axhline(y=cc_mean, color='blue', linestyle='--', alpha=0.7, linewidth=2)
+                                
+                                # Add CC-TMS annotation
+                                y_max = ax.get_ylim()[1]
+                                ax.text(i, cc_mean + (y_max * 0.02), f'CC: {cc_mean:.1f}', 
+                                       ha='center', va='bottom', fontweight='bold', color='blue')
+                    
+                    # Add legend
+                    from matplotlib.lines import Line2D
+                    legend_elements = [
+                        plt.Rectangle((0,0),1,1, facecolor='lightcoral', label='QL-CC-TMS'),
+                        Line2D([0], [0], color='blue', linestyle='--', label='CC-TMS Reference')
+                    ]
+                    ax.legend(handles=legend_elements, loc='upper right')
+                    
+                    # Adjust layout
+                    plt.tight_layout()
+                    
+                    # Save plot
+                    plot_filename = f"boxplot_{dag_type}_param_{param_value}_P{proc}_varying_buses_qlcctms_with_cctms.png"
+                    plot_filepath = os.path.join(self.results_dir, 'plots', plot_filename)
+                    plt.savefig(plot_filepath, dpi=300, bbox_inches='tight')
+                    
+                    print(f"  Generated plot {plot_count}: {plot_filename}")
+                    
+                    # Close figure to free memory
+                    plt.close(fig)
+                
+                # 2. CONSTANT BUSES, VARYING PROCESSORS
+                for bus in self.buses:
+                    # Only create plots for QL-CC-TMS, but annotate with CC-TMS comparison
+                    plot_count += 1
+                    
+                    # Filter data for constant bus and QL-CC-TMS
+                    ql_bus_data = dag_data[
+                        (dag_data['num_buses'] == bus) & 
+                        (dag_data['algorithm'] == 'qlcctms')
+                    ]
+                    
+                    # Filter data for constant bus and CC-TMS (for comparison)
+                    cc_bus_data = dag_data[
+                        (dag_data['num_buses'] == bus) & 
+                        (dag_data['algorithm'] == 'cctms')
+                    ]
+                    
+                    if ql_bus_data.empty:
+                        print(f"  Warning: No QL-CC-TMS data for B{bus}")
+                        continue
+                    
+                    # Create figure
+                    fig, ax = plt.subplots(figsize=(12, 6))
+                    
+                    # Create box plot with processors on X-axis for QL-CC-TMS
+                    sns.boxplot(
+                        data=ql_bus_data, 
+                        x='num_processors', 
+                        y='makespan',
+                        ax=ax,
+                        color='lightcoral'
+                    )
+                    
+                    # Customize plot
+                    title = f"{dag_type.replace('_', ' ').title()} (Param: {param_value}) - {bus} Bus{'es' if bus > 1 else ''} - QL-CC-TMS vs CC-TMS"
+                    ax.set_title(title, fontsize=14, fontweight='bold')
+                    ax.set_xlabel('Number of Processors', fontsize=12)
+                    ax.set_ylabel('Makespan (ms)', fontsize=12)
+                    
+                    # Add grid for better readability
+                    ax.grid(True, alpha=0.3)
+                    
+                    # Add QL-CC-TMS mean values and CC-TMS comparison
+                    for i, proc_val in enumerate(sorted(ql_bus_data['num_processors'].unique())):
+                        # QL-CC-TMS data
+                        ql_proc_data_subset = ql_bus_data[ql_bus_data['num_processors'] == proc_val]['makespan']
+                        # CC-TMS data
+                        cc_proc_data_subset = cc_bus_data[cc_bus_data['num_processors'] == proc_val]['makespan']
+                        
+                        if len(ql_proc_data_subset) > 0:
+                            ql_mean = ql_proc_data_subset.mean()
+                            ax.text(i, ql_mean, f'QL: {ql_mean:.1f}', 
+                                   ha='center', va='bottom', fontweight='bold', color='red')
+                            
+                            # Add CC-TMS comparison line and annotation
+                            if len(cc_proc_data_subset) > 0:
+                                cc_mean = cc_proc_data_subset.mean()
+                                # Draw horizontal line for CC-TMS makespan
+                                ax.axhline(y=cc_mean, color='blue', linestyle='--', alpha=0.7, linewidth=2)
+                                
+                                # Add CC-TMS annotation
+                                y_max = ax.get_ylim()[1]
+                                ax.text(i, cc_mean + (y_max * 0.02), f'CC: {cc_mean:.1f}', 
+                                       ha='center', va='bottom', fontweight='bold', color='blue')
+                    
+                    # Add legend
+                    from matplotlib.lines import Line2D
+                    legend_elements = [
+                        plt.Rectangle((0,0),1,1, facecolor='lightcoral', label='QL-CC-TMS'),
+                        Line2D([0], [0], color='blue', linestyle='--', label='CC-TMS Reference')
+                    ]
+                    ax.legend(handles=legend_elements, loc='upper right')
+                    
+                    # Adjust layout
+                    plt.tight_layout()
+                    
+                    # Save plot
+                    plot_filename = f"boxplot_{dag_type}_param_{param_value}_B{bus}_varying_processors_qlcctms_with_cctms.png"
+                    plot_filepath = os.path.join(self.results_dir, 'plots', plot_filename)
+                    plt.savefig(plot_filepath, dpi=300, bbox_inches='tight')
+                    
+                    print(f"  Generated plot {plot_count}: {plot_filename}")
+                    
+                    # Close figure to free memory
+                    plt.close(fig)
+        
+        print(f"\nAll {plot_count} box plots generated successfully!")
+        print(f"Plots saved to: {os.path.join(self.results_dir, 'plots')}")
+    
+    def generate_line_plots(self, results_df):
+        """
+        Generate line plots showing average makespans for both algorithms.
+        
+        For each DAG type and parameter combination, generates:
+        - Line plots with constant processors, varying buses
+        - Line plots with constant buses, varying processors
+        
+        Args:
+            results_df (pd.DataFrame): Experiment results
+        """
+        print(f"\n" + "="*80)
+        print("GENERATING LINE PLOTS (AVERAGE MAKESPANS)")
+        print("="*80)
+        print("Generating line plots showing average makespans:")
+        print("  - Constant processors, varying buses")
+        print("  - Constant buses, varying processors")
+        
+        # Set up plotting style
+        plt.style.use('default')
+        
+        plot_count = 0
+        expected_plots = len(list(self.dag_configs.values())[0]) * (len(self.processors) + len(self.buses))
         
         # Generate plots for each DAG type and parameter
         for dag_type, param_values in self.dag_configs.items():
@@ -322,45 +563,53 @@ class AbsoluteMakespanComparator:
                     if proc_data.empty:
                         print(f"  Warning: No data for P{proc}")
                         continue
+
+                    avg_data = proc_data.groupby(['algorithm', 'num_buses'])['makespan'].mean().reset_index()
                     
                     # Create figure
                     fig, ax = plt.subplots(figsize=(10, 6))
                     
                     # Create box plot with buses on X-axis
-                    sns.boxplot(
-                        data=proc_data, 
-                        x='num_buses', 
-                        y='makespan', 
-                        hue='algorithm',
-                        ax=ax
-                    )
+                    for algorithm in self.algorithms:
+                        alg_data = avg_data[avg_data['algorithm'] == algorithm]
+                        if not alg_data.empty:
+                            color = PlotConfig.QLCCTMS_COLOR if algorithm == Algorithms.QLCCTMS else PlotConfig.CCTMS_COLOR
+                            marker = PlotConfig.QLCCTMS_MARKER if algorithm == Algorithms.QLCCTMS else PlotConfig.CCTMS_MARKER
+                            label = PlotConfig.QLCCTMS_LABEL if algorithm == Algorithms.QLCCTMS else PlotConfig.CCTMS_LABEL
+                            
+                            ax.plot(alg_data['num_buses'], alg_data['makespan'], 
+                                   color=color, marker=marker, linewidth=2, markersize=8,
+                                   label=label)
+                            
+                            # Add value annotations
+                            for _, row in alg_data.iterrows():
+                                ax.annotate(f'{row["makespan"]:.1f}', 
+                                          (row['num_buses'], row['makespan']),
+                                          textcoords="offset points", xytext=(0,10), 
+                                          ha='center', fontsize=9, color=color)
                     
                     # Customize plot
-                    title = f"{dag_type.replace('_', ' ').title()} (Param: {param_value}) - {proc} Processors"
+                    title = f"{dag_type.replace('_', ' ').title()} (Param: {param_value}) - {proc} Processors - Average Makespan"
                     ax.set_title(title, fontsize=14, fontweight='bold')
                     ax.set_xlabel('Number of Buses', fontsize=12)
-                    ax.set_ylabel('Makespan (ms)', fontsize=12)
+                    ax.set_ylabel('Average Makespan (ms)', fontsize=12)
                     
-                    # Customize legend
-                    legend = ax.legend(title='Algorithm', loc='upper right')
-                    legend.get_title().set_fontweight('bold')
-                    
-                    # Add grid for better readability
+                    # Add grid and legend
                     ax.grid(True, alpha=0.3)
+                    ax.legend(loc='best')
                     
-                    # Add statistical annotations
-                    self._add_statistical_annotations_by_category(ax, proc_data, 'num_buses')
+                    # Set integer ticks for x-axis
+                    ax.set_xticks(sorted(proc_data['num_buses'].unique()))
                     
                     # Adjust layout
                     plt.tight_layout()
                     
                     # Save plot
-                    plot_filename = f"boxplot_{dag_type}_param_{param_value}_P{proc}_varying_buses.png"
+                    plot_filename = f"lineplot_{dag_type}_param_{param_value}_P{proc}_varying_buses_avg_makespan.png"
                     plot_filepath = os.path.join(self.results_dir, 'plots', plot_filename)
                     plt.savefig(plot_filepath, dpi=300, bbox_inches='tight')
                     
-                    if plot_count % 20 == 0:
-                        print(f"  Generated {plot_count}/{total_expected_plots} plots...")
+                    print(f"  Generated line plot {plot_count}: {plot_filename}")
                     
                     # Close figure to free memory
                     plt.close(fig)
@@ -375,54 +624,61 @@ class AbsoluteMakespanComparator:
                     if bus_data.empty:
                         print(f"  Warning: No data for B{bus}")
                         continue
+
+                    # Calculate average makespans for each algorithm and processor count
+                    avg_data = bus_data.groupby(['algorithm', 'num_processors'])['makespan'].mean().reset_index()
                     
                     # Create figure
                     fig, ax = plt.subplots(figsize=(10, 6))
                     
                     # Create box plot with processors on X-axis
-                    sns.boxplot(
-                        data=bus_data, 
-                        x='num_processors', 
-                        y='makespan', 
-                        hue='algorithm',
-                        ax=ax
-                    )
+                    # Plot lines for each algorithm
+                    for algorithm in self.algorithms:
+                        alg_data = avg_data[avg_data['algorithm'] == algorithm]
+                        if not alg_data.empty:
+                            color = PlotConfig.QLCCTMS_COLOR if algorithm == Algorithms.QLCCTMS else PlotConfig.CCTMS_COLOR
+                            marker = PlotConfig.QLCCTMS_MARKER if algorithm == Algorithms.QLCCTMS else PlotConfig.CCTMS_MARKER
+                            label = PlotConfig.QLCCTMS_LABEL if algorithm == Algorithms.QLCCTMS else PlotConfig.CCTMS_LABEL
+                            
+                            ax.plot(alg_data['num_processors'], alg_data['makespan'], 
+                                   color=color, marker=marker, linewidth=2, markersize=8,
+                                   label=label)
+                            
+                            # Add value annotations
+                            for _, row in alg_data.iterrows():
+                                ax.annotate(f'{row["makespan"]:.1f}', 
+                                          (row['num_processors'], row['makespan']),
+                                          textcoords="offset points", xytext=(0,10), 
+                                          ha='center', fontsize=9, color=color)
                     
                     # Customize plot
-                    title = f"{dag_type.replace('_', ' ').title()} (Param: {param_value}) - {bus} Bus{'es' if bus > 1 else ''}"
+                    title = f"{dag_type.replace('_', ' ').title()} (Param: {param_value}) - {bus} Bus{'es' if bus > 1 else ''} - Average Makespan"
                     ax.set_title(title, fontsize=14, fontweight='bold')
                     ax.set_xlabel('Number of Processors', fontsize=12)
-                    ax.set_ylabel('Makespan (ms)', fontsize=12)
+                    ax.set_ylabel('Average Makespan (ms)', fontsize=12)
                     
-                    # Customize legend
-                    legend = ax.legend(title='Algorithm', loc='upper right')
-                    legend.get_title().set_fontweight('bold')
-                    
-                    # Add grid for better readability
+                    # Add grid and legend
                     ax.grid(True, alpha=0.3)
+                    ax.legend(loc='best')
                     
-                    # Add statistical annotations
-                    self._add_statistical_annotations_by_category(ax, bus_data, 'num_processors')
+                    # Set integer ticks for x-axis
+                    ax.set_xticks(sorted(bus_data['num_processors'].unique()))
                     
                     # Adjust layout
                     plt.tight_layout()
                     
                     # Save plot
-                    plot_filename = f"boxplot_{dag_type}_param_{param_value}_B{bus}_varying_processors.png"
+                    plot_filename = f"lineplot_{dag_type}_param_{param_value}_B{bus}_varying_processors_avg_makespan.png"
                     plot_filepath = os.path.join(self.results_dir, 'plots', plot_filename)
                     plt.savefig(plot_filepath, dpi=300, bbox_inches='tight')
                     
-                    if plot_count % 20 == 0:
-                        print(f"  Generated {plot_count}/{total_expected_plots} plots...")
-                    
+                    print(f"  Generated line plot {plot_count}: {plot_filename}")
+
                     # Close figure to free memory
                     plt.close(fig)
         
-        print(f"\nAll {plot_count} box plots generated successfully!")
-        print(f"Plot types generated:")
-        print(f"  - Constant processors, varying buses: {len(self.dag_configs) * 4 * len(self.processors)} plots")
-        print(f"  - Constant buses, varying processors: {len(self.dag_configs) * 4 * len(self.buses)} plots")
-        print(f"Plots saved to: {os.path.join(self.results_dir, 'plots')}")
+        print(f"\nAll {plot_count} line plots generated successfully!")
+        print(f"Line plots saved to: {os.path.join(self.results_dir, 'plots')}")
     
     def _add_statistical_annotations(self, ax, data):
         """
@@ -558,31 +814,120 @@ class AbsoluteMakespanComparator:
         print(f"  Total experimental runs: {summary_stats['overall']['total_experiments']}")
         print(f"  Unique configurations: {summary_stats['overall']['unique_configurations']}")
         
-        cctms_mean = algorithm_stats['cctms']['mean_makespan']
-        qlcctms_mean = algorithm_stats['qlcctms']['mean_makespan']
+        if len(algorithm_stats) == 2:
+            cctms_mean = algorithm_stats[Algorithms.CCTMS]['mean_makespan']
+            qlcctms_mean = algorithm_stats[Algorithms.QLCCTMS]['mean_makespan']
+            
+            print(f"\nAlgorithm Performance:")
+            print(f"  CC-TMS average makespan: {cctms_mean:.2f} ms")
+            print(f"  QL-CC-TMS average makespan: {qlcctms_mean:.2f} ms")
+            
+            if cctms_mean < qlcctms_mean:
+                improvement = ((qlcctms_mean - cctms_mean) / qlcctms_mean) * 100
+                print(f"  CC-TMS performs {improvement:.1f}% better on average")
+            else:
+                improvement = ((cctms_mean - qlcctms_mean) / cctms_mean) * 100
+                print(f"  QL-CC-TMS performs {improvement:.1f}% better on average")
         
-        print(f"\nAlgorithm Performance:")
-        print(f"  CC-TMS average makespan: {cctms_mean:.2f} ms")
-        print(f"  QL-CC-TMS average makespan: {qlcctms_mean:.2f} ms")
+        return summary_stats
+    
+    def _add_statistical_annotations_by_category(self, ax, data, category_column):
+        """
+        Add statistical significance annotations to box plots grouped by category.
         
-        if cctms_mean < qlcctms_mean:
-            improvement = ((qlcctms_mean - cctms_mean) / qlcctms_mean) * 100
-            print(f"  CC-TMS performs {improvement:.1f}% better on average")
-        else:
-            improvement = ((cctms_mean - qlcctms_mean) / cctms_mean) * 100
-            print(f"  QL-CC-TMS performs {improvement:.1f}% better on average")
+        Args:
+            ax: Matplotlib axis object
+            data (pd.DataFrame): Data for the current plot
+            category_column (str): Column name to group by ('num_buses' or 'num_processors')
+        """
+        # Get unique category values (e.g., bus numbers or processor numbers)
+        categories = sorted(data[category_column].unique())
+        
+        for i, category_val in enumerate(categories):
+            category_data = data[data[category_column] == category_val]
+            
+            cctms_data = category_data[category_data['algorithm'] == 'cctms']['makespan']
+            qlcctms_data = category_data[category_data['algorithm'] == 'qlcctms']['makespan']
+            
+            if len(cctms_data) > 0 and len(qlcctms_data) > 0:
+                # Perform t-test (simple comparison)
+                try:
+                    t_stat, p_value = stats.ttest_ind(cctms_data, qlcctms_data)
+                    
+                    # Add significance marker if p < 0.05
+                    if p_value < 0.05:
+                        y_max = max(category_data['makespan'].max(), 
+                                   cctms_data.max(), qlcctms_data.max())
+                        ax.text(i, y_max * 1.05, '*', ha='center', va='bottom', 
+                               fontsize=16, fontweight='bold')
+                except:
+                    pass  # Skip if statistical test fails
+    
+    def generate_summary_statistics(self, results_df):
+        """
+        Generate comprehensive summary statistics for the experiment.
+        
+        Args:
+            results_df (pd.DataFrame): Experiment results
+            
+        Returns:
+            dict: Summary statistics
+        """
+        print(f"\n" + "="*80)
+        print("GENERATING SUMMARY STATISTICS")
+        print("="*80)
+        
+        summary_stats = {}
+        
+        # Overall statistics
+        summary_stats['overall'] = {
+            'total_experiments': len(results_df),
+            'unique_configurations': len(results_df.groupby(['dag_type', 'dag_parameter', 'platform_config', 'algorithm'])),
+            'algorithms_tested': results_df['algorithm'].unique().tolist(),
+            'dag_types_tested': results_df['dag_type'].unique().tolist()
+        }
+        
+        # Algorithm comparison
+        algorithm_stats = {}
+        for algorithm in self.algorithms:
+            alg_data = results_df[results_df['algorithm'] == algorithm]['makespan']
+            if len(alg_data) > 0:
+                algorithm_stats[algorithm] = {
+                    'mean_makespan': float(alg_data.mean()),
+                    'median_makespan': float(alg_data.median()),
+                    'std_makespan': float(alg_data.std()),
+                    'min_makespan': float(alg_data.min()),
+                    'max_makespan': float(alg_data.max()),
+                    'total_runs': len(alg_data)
+                }
+        
+        summary_stats['algorithm_comparison'] = algorithm_stats
+        
+        # Print key findings
+        print("\nKey Findings:")
+        print(f"  Total experimental runs: {summary_stats['overall']['total_experiments']}")
+        print(f"  Unique configurations: {summary_stats['overall']['unique_configurations']}")
+        
+        if len(algorithm_stats) == 2:
+            cctms_mean = algorithm_stats['cctms']['mean_makespan']
+            qlcctms_mean = algorithm_stats['qlcctms']['mean_makespan']
+            
+            print(f"\nAlgorithm Performance:")
+            print(f"  CC-TMS average makespan: {cctms_mean:.2f} ms")
+            print(f"  QL-CC-TMS average makespan: {qlcctms_mean:.2f} ms")
+            
+            if cctms_mean < qlcctms_mean:
+                improvement = ((qlcctms_mean - cctms_mean) / qlcctms_mean) * 100
+                print(f"  CC-TMS performs {improvement:.1f}% better on average")
+            else:
+                improvement = ((cctms_mean - qlcctms_mean) / cctms_mean) * 100
+                print(f"  QL-CC-TMS performs {improvement:.1f}% better on average")
         
         return summary_stats
     
     def run_complete_experiment(self):
         """
         Run the complete absolute makespan comparison experiment.
-        
-        This method orchestrates the entire experimental process:
-        1. Runs all experimental configurations
-        2. Saves results to CSV and metadata to JSON
-        3. Generates 128 box plots for visualization
-        4. Computes summary statistics
         
         Returns:
             tuple: (results_dataframe, metadata, summary_statistics)
@@ -591,11 +936,14 @@ class AbsoluteMakespanComparator:
         print("ABSOLUTE MAKESPAN COMPARISON EXPERIMENT")
         print("="*80)
         print("This experiment will:")
-        print(f"  - Test {len(self.dag_configs)} DAG types with different parameters")
+        print(f"  - Test {len(self.dag_configs)} DAG types with 4 parameter values each")
         print(f"  - Use {len(self.processors)} × {len(self.buses)} platform configurations")
         print(f"  - Compare {len(self.algorithms)} scheduling algorithms")
         print(f"  - Run {self.iterations} iterations per configuration")
-        print(f"  - Generate 128 detailed box plots (constant proc/bus analysis)")
+        total_param_combinations = sum(len(params) for params in self.dag_configs.values())
+        expected_plots_per_type = total_param_combinations * (len(self.processors) + len(self.buses))
+        print(f"  - Generate {expected_plots_per_type} detailed QL-CC-TMS box plots (with CC-TMS reference lines)")
+        print(f"  - Generate {expected_plots_per_type} line plots showing average makespans (both algorithms)")
         print(f"  - Calculate comprehensive statistics")
         print("="*80)
         
@@ -607,43 +955,47 @@ class AbsoluteMakespanComparator:
         
         # Generate visualizations
         self.generate_box_plots(results_df)
+        self.generate_line_plots(results_df)
         
         # Generate summary statistics
         summary_stats = self.generate_summary_statistics(results_df)
         
         # Save summary statistics
-        summary_file = os.path.join(self.results_dir, f"summary_statistics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+        summary_file = os.path.join(self.results_dir, f"absolute_makespan_comparison_summary_statistics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
         with open(summary_file, 'w') as f:
             json.dump(summary_stats, f, indent=2)
         
         print(f"\n" + "="*80)
-        print("EXPERIMENT COMPLETE!")
+        print("ABSOLUTE MAKESPAN COMPARISON EXPERIMENT COMPLETE!")
         print("="*80)
         print(f"Results files:")
         print(f"  - CSV data: {csv_file}")
         print(f"  - Metadata: {json_file}")
         print(f"  - Statistics: {summary_file}")
-        print(f"  - Box plots: {os.path.join(self.results_dir, 'plots')} (32 plots)")
+        total_param_combinations = sum(len(params) for params in self.dag_configs.values())
+        expected_plots_per_type = total_param_combinations * (len(self.processors) + len(self.buses))
+        total_plots = expected_plots_per_type * 2  # Box plots + Line plots
+        print(f"  - Plots: {os.path.join(self.results_dir, 'plots')} ({expected_plots_per_type} box plots + {expected_plots_per_type} line plots = {total_plots} total)")
         
         return results_df, metadata, summary_stats
 
 
 def main():
     """
-    Main function to run the absolute makespan comparison experiment.
+    Main function to run the complete absolute makespan comparison experiment.
     """
     print("Starting Absolute Makespan Comparison Experiment...")
     
-    # Create experiment instance
+    # Create experiment instance with full parameters
     experiment = AbsoluteMakespanComparator(
         results_dir="./results", 
-        iterations=100  # 100 iterations as specified
+        iterations=100  # Full 100 iterations for statistical significance
     )
     
     # Run complete experiment
     results_df, metadata, summary_stats = experiment.run_complete_experiment()
     
-    print("\nExperiment completed successfully!")
+    print("\nFull experiment completed successfully!")
     print(f"Check the results directory for detailed outputs and visualizations.")
 
 

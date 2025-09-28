@@ -21,6 +21,12 @@ from src.schedulers import SchedulerFactory
 from src.cost_matrices import generate_cost_matrices  # Changed this line
 from src.experiment_runner import ExperimentRunner, ExperimentConfig, ExperimentResult
 
+# Import centralized configuration
+from config.constants import (
+    DAGTypes, Algorithms, DEFAULT_QL_PARAMS, ExperimentConfig,
+    PlotConfig, FileConfig, ProgressConfig
+)
+
 
 class AbsoluteMakespanComparator:
     """
@@ -46,16 +52,17 @@ class AbsoluteMakespanComparator:
         self.ccr = 1.0 
         
         # Experiment parameters - REDUCED for small test
-        self.dag_configs = {
-            'gaussian': [5]      # 4 χ values for testing
-        }
+        self.dag_configs = ExperimentConfig.SMALL_DAG_CONFIGS.copy()
         
         # Platform configurations - REDUCED for small test
-        self.processors = [2, 4, 6, 8, 10]                 # Just 5 p values
-        self.buses = [1]                     # At least 2 b values for meaningful plots
+        self.processors = ExperimentConfig.SMALL_PROCESSORS.copy()
+        self.buses = ExperimentConfig.SMALL_BUSES.copy()
         
         # Algorithms to compare
-        self.algorithms = ['cctms', 'qlcctms']
+        self.algorithms = [Algorithms.CCTMS, Algorithms.QLCCTMS]
+        
+        # Q-learning parameters
+        self.ql_params = DEFAULT_QL_PARAMS.copy()
         
         # Create results directory if it doesn't exist
         os.makedirs(self.results_dir, exist_ok=True)
@@ -140,15 +147,9 @@ class AbsoluteMakespanComparator:
                     for algorithm in self.algorithms:
                         print(f"      Algorithm: {algorithm.upper()}")
                         
-                        # Create scheduler
-                        if algorithm == 'qlcctms':
-                            # Use stricter convergence for faster testing
-                            scheduler = SchedulerFactory.create_scheduler(
-                                algorithm, 
-                                max_episodes=5000,
-                                convergence_threshold=0.1,  # Less strict convergence (default 0.2)
-                                convergence_window=20       # Smaller window (default 40)
-                            )
+                        # Create scheduler with centralized parameters
+                        if algorithm == Algorithms.QLCCTMS:
+                            scheduler = SchedulerFactory.create_scheduler(algorithm, **self.ql_params)
                         else:
                             scheduler = SchedulerFactory.create_scheduler(algorithm)
                         
@@ -158,7 +159,7 @@ class AbsoluteMakespanComparator:
                             current_config += 1
                             
                             # Show progress
-                            if current_config % 10 == 0 or current_config == total_configs:
+                            if current_config % ProgressConfig.PROGRESS_INTERVAL_SMALL == 0 or current_config == total_configs:
                                 progress = (current_config / total_configs) * 100
                                 print(f"        Progress: {current_config}/{total_configs} ({progress:.1f}%)")
                             
@@ -727,8 +728,8 @@ class AbsoluteMakespanComparator:
         print(f"  Unique configurations: {summary_stats['overall']['unique_configurations']}")
         
         if len(algorithm_stats) == 2:
-            cctms_mean = algorithm_stats['cctms']['mean_makespan']
-            qlcctms_mean = algorithm_stats['qlcctms']['mean_makespan']
+            cctms_mean = algorithm_stats[Algorithms.CCTMS]['mean_makespan']
+            qlcctms_mean = algorithm_stats[Algorithms.QLCCTMS]['mean_makespan']
             
             print(f"\nAlgorithm Performance:")
             print(f"  CC-TMS average makespan: {cctms_mean:.2f} ms")
