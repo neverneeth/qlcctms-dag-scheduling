@@ -58,7 +58,7 @@ class CCTMSScheduler(SchedulingAlgorithm):
         priority_list = sorted(task_list, key=lambda t: -rank_u[t])
         
         # Schedule using list scheduling with CC-TMS heuristic
-        return self._cctms_schedule(graph, task_list, message_list, ET, CT, priority_list)
+        return self._cctms_schedule(graph, task_list, message_list, ET, CT, priority_list, rank_u)
     
     def _calculate_average_costs(self, task_list: List[str], message_list: List[str], 
                                ET: np.ndarray, CT: np.ndarray) -> Tuple[Dict[str, float], Dict[str, float]]:
@@ -99,7 +99,7 @@ class CCTMSScheduler(SchedulingAlgorithm):
         return rank_u
     
     def _cctms_schedule(self, graph: nx.DiGraph, task_list: List[str], message_list: List[str],
-                       ET: np.ndarray, CT: np.ndarray, priority_list: List[str]) -> Dict[str, Any]:
+                       ET: np.ndarray, CT: np.ndarray, priority_list: List[str], rank_u: Dict[str, float]) -> Dict[str, Any]:
         """CC-TMS list scheduling algorithm."""
         num_processors = len(ET[0])
         num_buses = len(CT[0])
@@ -127,7 +127,9 @@ class CCTMSScheduler(SchedulingAlgorithm):
             for p in range(num_processors):
                 temp_proc_avail = proc_avail[p]
                 pred_msgs = [pred for pred in graph.predecessors(task) 
-                           if graph.nodes[pred]['type'] == 'message']
+                            if graph.nodes[pred]['type'] == 'message']
+           
+                pred_msgs.sort(key=lambda m: rank_u[m], reverse=True)
                 temp_bus_avail = bus_avail[:]
                 msg_sched = {}
                 pred_msg_finish = []
@@ -250,7 +252,7 @@ class QLCCTMSScheduler(SchedulingAlgorithm):
         
         # Schedule using CC-TMS with learned priority
         cctms = CCTMSScheduler()
-        result = cctms._cctms_schedule(graph, task_list, message_list, ET, CT, priority_list)
+        result = cctms._cctms_schedule(graph, task_list, message_list, ET, CT, priority_list, rank_u)
         result['algorithm'] = self.name
         result['q_learning_episodes'] = episodes
         result['q_learning_converged'] = converged

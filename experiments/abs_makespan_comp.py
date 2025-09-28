@@ -73,7 +73,7 @@ class AbsoluteMakespanComparator:
         self.ccr = 1.0 
         
         # Experiment parameters using centralized configuration
-        self.dag_configs = {DAGTypes.GAUSSIAN: ExperimentConfig.FULL_DAG_CONFIGS[DAGTypes.GAUSSIAN]}
+        self.dag_configs = {DAGTypes.LAPLACE: ExperimentConfig.FULL_DAG_CONFIGS[DAGTypes.LAPLACE]}
         
         # Platform configurations
         self.processors = ExperimentConfig.FULL_PROCESSORS.copy()
