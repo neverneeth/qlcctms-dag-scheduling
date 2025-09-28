@@ -6,7 +6,7 @@ Analyzes experiment results and generates plots and statistics.
 
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 import pandas as pd
 import numpy as np
@@ -119,7 +119,7 @@ def analyze_results(results_file):
     return df, ratios_df
 
 
-def generate_visualizations(df, ratios_df, output_dir="../results/plots"):
+def generate_visualizations(df, ratios_df, output_dir="./results/plots"):
     """Generate visualizations for the results."""
     print(f"\n" + "=" * 80)
     print("GENERATING VISUALIZATIONS")
@@ -172,7 +172,7 @@ def generate_visualizations(df, ratios_df, output_dir="../results/plots"):
         print("Visualizations are optional and analysis can continue without them.")
 
 
-def export_summary_report(df, ratios_df, output_file="../results/summary_report.txt"):
+def export_summary_report(df, ratios_df, output_file="./results/summary_report.txt"):
     """Export a summary report to a text file."""
     print(f"Generating summary report: {output_file}")
     
@@ -224,7 +224,7 @@ if __name__ == "__main__":
     parser.add_argument('results_file', help='Path to the results CSV file')
     parser.add_argument('--plots', action='store_true', help='Generate visualization plots')
     parser.add_argument('--report', action='store_true', help='Generate summary report')
-    parser.add_argument('--output-dir', default='../results', help='Output directory for plots and reports')
+    parser.add_argument('--output-dir', default='./results', help='Output directory for plots and reports')
     
     args = parser.parse_args()
     

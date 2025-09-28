@@ -6,7 +6,7 @@ This script shows various ways to run experiments and analyze results.
 
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 import numpy as np
 import pandas as pd
@@ -82,7 +82,7 @@ def run_small_experiment():
     )
     
     # Run experiment
-    runner = ExperimentRunner(results_dir="../results")
+    runner = ExperimentRunner(results_dir="./results")
     
     def progress_callback(current, total):
         if current % 10 == 0 or current == total:

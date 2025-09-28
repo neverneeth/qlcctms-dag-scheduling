@@ -27,7 +27,7 @@ def run_comprehensive_experiments():
     print("=" * 80)
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    runner = ExperimentRunner(results_dir="../results")
+    runner = ExperimentRunner(results_dir="./results")
     all_results = []
     
     # Progress tracking
@@ -140,9 +140,9 @@ def run_quick_validation():
     print("=" * 80)
     print("QUICK VALIDATION EXPERIMENT")
     print("=" * 80)
-    
-    runner = ExperimentRunner(results_dir="../results")
-    
+
+    runner = ExperimentRunner(results_dir="./results")
+
     # Run a quick test with minimal parameters
     quick_config = ExperimentConfig(
         dag_type='gaussian',
@@ -180,7 +180,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run DAG scheduling experiments')
     parser.add_argument('--mode', choices=['quick', 'full'], default='quick',
                        help='Experiment mode: quick validation or full experiments')
-    parser.add_argument('--results-dir', default='../results',
+    parser.add_argument('--results-dir', default='./results',
                        help='Directory to save results')
     
     args = parser.parse_args()
