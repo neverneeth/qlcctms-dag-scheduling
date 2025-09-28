@@ -336,15 +336,22 @@ class StencilDAG(DAGGenerator):
         return task_count, message_count
 
 
+# Import centralized constants
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config.constants import DAGTypes
+
+
 # Factory for creating DAG generators
 class DAGFactory:
     """Factory for creating DAG generators."""
     
     _generators = {
-        'gaussian': GaussianEliminationDAG,
-        'epigenomics': EpigenomicsDAG,
-        'laplace': LaplaceDAG,
-        'stencil': StencilDAG
+        DAGTypes.GAUSSIAN: GaussianEliminationDAG,
+        DAGTypes.EPIGENOMICS: EpigenomicsDAG,
+        DAGTypes.LAPLACE: LaplaceDAG,
+        DAGTypes.STENCIL: StencilDAG
     }
     
     @classmethod

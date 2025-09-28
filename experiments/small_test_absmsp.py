@@ -15,6 +15,7 @@ from scipy import stats
 # Add the parent directory to the path to import framework modules
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
+from src.experiment_utils import SchedulerUtils
 from src.dag_generators import DAGFactory
 from src.schedulers import SchedulerFactory
 # Fix the import - use the actual function name from cost_matrices
@@ -39,7 +40,7 @@ class AbsoluteMakespanComparator:
     - Generates comprehensive box plots for visualization
     """
     
-    def __init__(self, results_dir="./results", iterations=10):  # Reduced iterations for testing
+    def __init__(self, results_dir="./results", iterations=30):  # Reduced iterations for testing
         """
         Initialize the experiment with configuration parameters.
         
@@ -148,10 +149,12 @@ class AbsoluteMakespanComparator:
                         print(f"      Algorithm: {algorithm.upper()}")
                         
                         # Create scheduler with centralized parameters
+                        # In run_experiment method:
+# Create scheduler with centralized parameters
                         if algorithm == Algorithms.QLCCTMS:
-                            scheduler = SchedulerFactory.create_scheduler(algorithm, **self.ql_params)
+                            scheduler = SchedulerUtils.create_scheduler_with_params(algorithm, self.ql_params)
                         else:
-                            scheduler = SchedulerFactory.create_scheduler(algorithm)
+                            scheduler = SchedulerUtils.create_scheduler_with_params(algorithm)
                         
                         # Run multiple iterations for statistical significance
                         iteration_results = []
@@ -806,7 +809,7 @@ def main():
     # Create experiment instance with reduced parameters for testing
     experiment = AbsoluteMakespanComparator(
         results_dir="./results", 
-        iterations=10  # Reduced iterations for quick testing
+        iterations=30  # Reduced iterations for quick testing
     )
     
     # Run complete experiment

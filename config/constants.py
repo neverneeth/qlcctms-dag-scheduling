@@ -43,9 +43,9 @@ DEFAULT_QL_PARAMS = {
     'epsilon': 0.2,                    # Exploration rate
     'learning_rate': 0.1,              # Learning rate (alpha)
     'discount': 0.8,                   # Discount factor (gamma)
-    'max_episodes': 5000,              # Maximum episodes (reduced from 300,000)
+    'max_episodes': 2000,              # Maximum episodes (reduced from 300,000)
     'convergence_window': 20,          # Window for convergence check (reduced from 40)
-    'convergence_threshold': 0.1       # Convergence threshold (reduced from 0.2)
+    'convergence_threshold': 0.5       # Convergence threshold (reduced from 0.2)
 }
 
 # Experiment Configuration

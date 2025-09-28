@@ -1,29 +1,22 @@
 """
 Absolute Makespan Comparison Experiment
 
-This experiment aims t        # Experiment parameters using centralized configuration
-        self.dag_configs = ExperimentConfig.FULL_DAG_CONFIGS.copy()
-        
-        # Platform configurations
-        self.processors = ExperimentConfig.FULL_PROCESSORS.copy()
-        self.buses = ExperimentConfig.FULL_BUSES.copy()
-        
-        # Algorithms to compare
-        self.algorithms = [Algorithms.CCTMS, Algorithms.QLCCTMS]
-        
-        # Q-learning parameters
-        self.ql_params = DEFAULT_QL_PARAMS.copy()absolute makespan values obtained by the CC-TMS and QL-CC-TMS algorithms 
-For all four DAG configurations with a set of parameters (Gaussian Elimination with χ={3, 4, 5, 6}, Epigenomics with γ={2, 3, 4, 5}, 
+This experiment aims to compare the absolute makespan values obtained by the CC-TMS and QL-CC-TMS algorithms 
+for all four DAG configurations with a set of parameters (Gaussian Elimination with χ={3, 4, 5, 6}, Epigenomics with γ={2, 3, 4, 5}, 
 Laplace with φ={2, 3, 4, 5}, Stencil with ξ={2, 3, 4, 5}) across various platform settings, p = {2, 4, 6, 8}
 and b = {1, 2, 3, 4} and constant CCR = 1.0. 
+
+Q-Learning Parameters (Research Paper Values):
+- epsilon: 0.2, learning_rate: 0.1, discount: 0.8
+- max_episodes: 300,000, convergence_window: 40, convergence_threshold: 0.2
 
 The results are saved to a CSV file for further analysis.
 
 The experiment runs 100 iterations for each configuration to ensure statistical significance.
 
-The experiment generates 128 box plots organized as:
-- Constant processors, varying buses (64 plots)
-- Constant buses, varying processors (64 plots)
+The experiment generates 256 plots organized as:
+- 128 box plots: Constant processors/varying buses (64) + Constant buses/varying processors (64)
+- 128 line plots: Average makespan trends with same organization
 The Y axis represents the absolute makespan values for the CC-TMS and QL-CC-TMS algorithms.
 
 Date: September 2025
@@ -51,9 +44,9 @@ from config.constants import (
 )
 
 from src.dag_generators import DAGFactory
-from src.schedulers import SchedulerFactory
+from src.schedulers import SchedulerFactory, CCTMSScheduler, QLCCTMSScheduler
 from src.cost_matrices import generate_cost_matrices
-from src.experiment_runner import ExperimentRunner, ExperimentConfig, ExperimentResult
+from src.experiment_utils import ExperimentUtils, ValidationUtils, DAGUtils, SchedulerUtils
 
 
 class AbsoluteMakespanComparator:
@@ -66,8 +59,8 @@ class AbsoluteMakespanComparator:
     - 100 iterations per configuration for statistical significance
     - Generates comprehensive box plots for visualization
     """
-    
-    def __init__(self, results_dir="./results", iterations=100):
+
+    def __init__(self, results_dir="./results/abs_makespan", iterations=100):
         """
         Initialize the experiment with configuration parameters.
         
@@ -80,7 +73,7 @@ class AbsoluteMakespanComparator:
         self.ccr = 1.0 
         
         # Experiment parameters using centralized configuration
-        self.dag_configs = ExperimentConfig.FULL_DAG_CONFIGS.copy()
+        self.dag_configs = {DAGTypes.GAUSSIAN: ExperimentConfig.FULL_DAG_CONFIGS[DAGTypes.GAUSSIAN]}
         
         # Platform configurations
         self.processors = ExperimentConfig.FULL_PROCESSORS.copy()
@@ -89,8 +82,16 @@ class AbsoluteMakespanComparator:
         # Algorithms to compare
         self.algorithms = [Algorithms.CCTMS, Algorithms.QLCCTMS]
         
-        # Q-learning parameters
-        self.ql_params = DEFAULT_QL_PARAMS.copy()
+        # Q-learning parameters - Using research paper values for full experiment
+        # Note: DEFAULT_QL_PARAMS in constants.py are reduced for faster testing
+        self.ql_params = {
+            'epsilon': 0.2,                    # Exploration rate
+            'learning_rate': 0.1,              # Learning rate (alpha)
+            'discount': 0.8,                   # Discount factor (gamma)
+            'max_episodes': 5000,            # Maximum episodes 
+            'convergence_window': 30,          # Window for convergence check 
+            'convergence_threshold': 0.1       # Convergence threshold 
+        }
         
         # Create results directory if it doesn't exist
         os.makedirs(self.results_dir, exist_ok=True)
@@ -99,7 +100,10 @@ class AbsoluteMakespanComparator:
         print(f"Absolute Makespan Comparison Experiment Initialized")
         print(f"Results directory: {self.results_dir}")
         print(f"Iterations per configuration: {self.iterations}")
-        print(f"Total configurations: {self._calculate_total_configurations()}")
+        total_configs = ExperimentUtils.calculate_total_configurations(
+            self.dag_configs, self.processors, self.buses, self.algorithms, self.iterations
+        )
+        print(f"Total configurations: {total_configs}")
         # Calculate expected plots: 4 DAG types × 4 parameters × (4 processors + 4 buses) = 128 plots each
         total_param_combinations = sum(len(params) for params in self.dag_configs.values())
         expected_plots_per_type = total_param_combinations * (len(self.processors) + len(self.buses))
@@ -108,12 +112,7 @@ class AbsoluteMakespanComparator:
         print(f"  - Line plots: {expected_plots_per_type} (both algorithms)")
         print(f"  - Total plots: {expected_plots_per_type * 2}")
         print(f"  - Only QL-CC-TMS plots generated (CC-TMS shown as reference lines)")    
-    def _calculate_total_configurations(self):
-        """Calculate the total number of experimental configurations."""
-        total = 0
-        for dag_type, params in self.dag_configs.items():
-            total += len(params) * len(self.processors) * len(self.buses) * len(self.algorithms) * self.iterations
-        return total
+
     
     def run_experiment(self):
         """
@@ -132,11 +131,15 @@ class AbsoluteMakespanComparator:
         # Initialize experiment tracking
         all_results = []
         experiment_start_time = datetime.now()
-        total_configs = self._calculate_total_configurations()
+        total_configs = ExperimentUtils.calculate_total_configurations(
+            self.dag_configs, self.processors, self.buses, self.algorithms, self.iterations
+        )
         current_config = 0
         
-        # Create experiment runner
-        runner = ExperimentRunner()
+        # Validate experiment parameters
+        ValidationUtils.validate_experiment_parameters(
+            self.dag_configs, self.processors, self.buses, self.iterations
+        )
         
         # Iterate through all DAG types and their parameters
         for dag_type, param_values in self.dag_configs.items():
@@ -148,16 +151,13 @@ class AbsoluteMakespanComparator:
                 # Generate DAG with current parameter
                 dag_generator = DAGFactory.create_generator(dag_type)
                 
-                # Set the appropriate parameter based on DAG type
-                if dag_type == 'gaussian':
-                    dag, task_list, message_list = dag_generator.generate(chi=param_value)
-                elif dag_type == 'epigenomics':
-                    dag, task_list, message_list = dag_generator.generate(gamma=param_value)
-                elif dag_type == 'laplace':
-                    dag, task_list, message_list = dag_generator.generate(phi=param_value)
-                elif dag_type == 'stencil':
-                    # For stencil, use param_value for xi (levels and tasks per level)
-                    dag, task_list, message_list = dag_generator.generate(xi=param_value)
+                # Generate DAG using utility function
+                dag, task_list, message_list = DAGUtils.generate_dag_with_parameters(
+                    dag_generator, dag_type, param_value
+                )
+                
+                # Validate DAG generation
+                DAGUtils.validate_dag_result(dag, task_list, message_list, dag_type, param_value)
                 
                 # Test across all platform configurations
                 for num_proc, num_bus in product(self.processors, self.buses):
@@ -175,11 +175,8 @@ class AbsoluteMakespanComparator:
                     for algorithm in self.algorithms:
                         print(f"      Algorithm: {algorithm.upper()}")
                         
-                        # Create scheduler with centralized parameters
-                        if algorithm == Algorithms.QLCCTMS:
-                            scheduler = SchedulerFactory.create_scheduler(algorithm, **self.ql_params)
-                        else:
-                            scheduler = SchedulerFactory.create_scheduler(algorithm)
+                        # Create scheduler using utility function
+                        scheduler = SchedulerUtils.create_scheduler_with_params(algorithm, self.ql_params)
                         
                         # Run multiple iterations for statistical significance
                         iteration_results = []
@@ -318,12 +315,19 @@ class AbsoluteMakespanComparator:
         plt.style.use('default')
         sns.set_palette("husl")
         
+        # Create base plot directory
+        base_plot_dir = os.path.join(self.results_dir, 'plots')
+        os.makedirs(base_plot_dir, exist_ok=True)
+        
         plot_count = 0
         
         expected_plots = len(list(self.dag_configs.values())[0]) * (len(self.processors) + len(self.buses))
         
         # Generate plots for each DAG type and parameter
         for dag_type, param_values in self.dag_configs.items():
+            # Create DAG type directory
+            dag_dir = os.path.join(base_plot_dir, dag_type)
+            os.makedirs(dag_dir, exist_ok=True)
             for param_value in param_values:
                 
                 # Filter data for current DAG configuration
@@ -414,9 +418,15 @@ class AbsoluteMakespanComparator:
                     # Adjust layout
                     plt.tight_layout()
                     
+                    # Create organized directory structure
+                    param_dir = os.path.join(dag_dir, f'param_{param_value}')
+                    box_plots_dir = os.path.join(param_dir, 'box_plots')
+                    constant_proc_dir = os.path.join(box_plots_dir, 'constant_processors')
+                    os.makedirs(constant_proc_dir, exist_ok=True)
+                    
                     # Save plot
                     plot_filename = f"boxplot_{dag_type}_param_{param_value}_P{proc}_varying_buses_qlcctms_with_cctms.png"
-                    plot_filepath = os.path.join(self.results_dir, 'plots', plot_filename)
+                    plot_filepath = os.path.join(constant_proc_dir, plot_filename)
                     plt.savefig(plot_filepath, dpi=300, bbox_inches='tight')
                     
                     print(f"  Generated plot {plot_count}: {plot_filename}")
@@ -500,9 +510,15 @@ class AbsoluteMakespanComparator:
                     # Adjust layout
                     plt.tight_layout()
                     
+                    # Create organized directory structure
+                    param_dir = os.path.join(dag_dir, f'param_{param_value}')
+                    box_plots_dir = os.path.join(param_dir, 'box_plots')
+                    constant_bus_dir = os.path.join(box_plots_dir, 'constant_buses')
+                    os.makedirs(constant_bus_dir, exist_ok=True)
+                    
                     # Save plot
                     plot_filename = f"boxplot_{dag_type}_param_{param_value}_B{bus}_varying_processors_qlcctms_with_cctms.png"
-                    plot_filepath = os.path.join(self.results_dir, 'plots', plot_filename)
+                    plot_filepath = os.path.join(constant_bus_dir, plot_filename)
                     plt.savefig(plot_filepath, dpi=300, bbox_inches='tight')
                     
                     print(f"  Generated plot {plot_count}: {plot_filename}")
@@ -511,7 +527,8 @@ class AbsoluteMakespanComparator:
                     plt.close(fig)
         
         print(f"\nAll {plot_count} box plots generated successfully!")
-        print(f"Plots saved to: {os.path.join(self.results_dir, 'plots')}")
+        print(f"Plots organized in: {os.path.join(self.results_dir, 'plots')}")
+        print("Structure: dag_type/param_value/box_plots/constant_processors|constant_buses/")
     
     def generate_line_plots(self, results_df):
         """
@@ -537,8 +554,15 @@ class AbsoluteMakespanComparator:
         plot_count = 0
         expected_plots = len(list(self.dag_configs.values())[0]) * (len(self.processors) + len(self.buses))
         
+        # Create base plot directory
+        base_plot_dir = os.path.join(self.results_dir, 'plots')
+        os.makedirs(base_plot_dir, exist_ok=True)
+        
         # Generate plots for each DAG type and parameter
         for dag_type, param_values in self.dag_configs.items():
+            # Create DAG type directory
+            dag_dir = os.path.join(base_plot_dir, dag_type)
+            os.makedirs(dag_dir, exist_ok=True)
             for param_value in param_values:
                 
                 # Filter data for current DAG configuration
@@ -604,9 +628,15 @@ class AbsoluteMakespanComparator:
                     # Adjust layout
                     plt.tight_layout()
                     
+                    # Create organized directory structure
+                    param_dir = os.path.join(dag_dir, f'param_{param_value}')
+                    line_plots_dir = os.path.join(param_dir, 'line_plots')
+                    constant_proc_dir = os.path.join(line_plots_dir, 'constant_processors')
+                    os.makedirs(constant_proc_dir, exist_ok=True)
+                    
                     # Save plot
                     plot_filename = f"lineplot_{dag_type}_param_{param_value}_P{proc}_varying_buses_avg_makespan.png"
-                    plot_filepath = os.path.join(self.results_dir, 'plots', plot_filename)
+                    plot_filepath = os.path.join(constant_proc_dir, plot_filename)
                     plt.savefig(plot_filepath, dpi=300, bbox_inches='tight')
                     
                     print(f"  Generated line plot {plot_count}: {plot_filename}")
@@ -667,9 +697,15 @@ class AbsoluteMakespanComparator:
                     # Adjust layout
                     plt.tight_layout()
                     
+                    # Create organized directory structure
+                    param_dir = os.path.join(dag_dir, f'param_{param_value}')
+                    line_plots_dir = os.path.join(param_dir, 'line_plots')
+                    constant_bus_dir = os.path.join(line_plots_dir, 'constant_buses')
+                    os.makedirs(constant_bus_dir, exist_ok=True)
+                    
                     # Save plot
                     plot_filename = f"lineplot_{dag_type}_param_{param_value}_B{bus}_varying_processors_avg_makespan.png"
-                    plot_filepath = os.path.join(self.results_dir, 'plots', plot_filename)
+                    plot_filepath = os.path.join(constant_bus_dir, plot_filename)
                     plt.savefig(plot_filepath, dpi=300, bbox_inches='tight')
                     
                     print(f"  Generated line plot {plot_count}: {plot_filename}")
@@ -678,7 +714,8 @@ class AbsoluteMakespanComparator:
                     plt.close(fig)
         
         print(f"\nAll {plot_count} line plots generated successfully!")
-        print(f"Line plots saved to: {os.path.join(self.results_dir, 'plots')}")
+        print(f"Line plots organized in: {os.path.join(self.results_dir, 'plots')}")
+        print("Structure: dag_type/param_value/line_plots/constant_processors|constant_buses/")
     
     def _add_statistical_annotations(self, ax, data):
         """

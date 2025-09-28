@@ -14,6 +14,10 @@ import seaborn as sns
 from datetime import datetime
 from typing import Dict, List, Tuple, Any, Optional
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from config.constants import (
     DAGTypes, Algorithms, DEFAULT_QL_PARAMS, ExperimentConfig,
     PlotConfig, FileConfig, ProgressConfig, ErrorConfig, ValidationConfig

@@ -12,6 +12,12 @@ import random
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Dict, List, Tuple, Any, Optional
+import sys
+import os
+
+# Add parent directory to path for importing config
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config.constants import DEFAULT_QL_PARAMS
 
 
 class SchedulingAlgorithm(ABC):
@@ -212,16 +218,17 @@ class CCTMSScheduler(SchedulingAlgorithm):
 class QLCCTMSScheduler(SchedulingAlgorithm):
     """QL-CC-TMS (Q-Learning based CC-TMS) Algorithm."""
     
-    def __init__(self, epsilon: float = 0.2, learning_rate: float = 0.1, 
-                 discount: float = 0.8, max_episodes: int = 300000,
-                 convergence_window: int = 40, convergence_threshold: float = 0.2):
+    def __init__(self, epsilon: float = None, learning_rate: float = None, 
+                 discount: float = None, max_episodes: int = None,
+                 convergence_window: int = None, convergence_threshold: float = None):
         self.name = "QL-CC-TMS"
-        self.epsilon = epsilon
-        self.learning_rate = learning_rate
-        self.discount = discount
-        self.max_episodes = max_episodes
-        self.convergence_window = convergence_window
-        self.convergence_threshold = convergence_threshold
+        # Use provided values or fall back to centralized defaults
+        self.epsilon = epsilon if epsilon is not None else DEFAULT_QL_PARAMS['epsilon']
+        self.learning_rate = learning_rate if learning_rate is not None else DEFAULT_QL_PARAMS['learning_rate']
+        self.discount = discount if discount is not None else DEFAULT_QL_PARAMS['discount']
+        self.max_episodes = max_episodes if max_episodes is not None else DEFAULT_QL_PARAMS['max_episodes']
+        self.convergence_window = convergence_window if convergence_window is not None else DEFAULT_QL_PARAMS['convergence_window']
+        self.convergence_threshold = convergence_threshold if convergence_threshold is not None else DEFAULT_QL_PARAMS['convergence_threshold']
     
     def schedule(self, graph: nx.DiGraph, task_list: List[str], message_list: List[str], 
                 ET: np.ndarray, CT: np.ndarray, random_state: Optional[int] = None, **kwargs) -> Dict[str, Any]:
