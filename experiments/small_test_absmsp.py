@@ -138,19 +138,16 @@ class AbsoluteMakespanComparator:
                     print(f"    Platform: {platform_config}")
                     
                     # Generate cost matrices for current platform using the correct function
-                    ET, CT, TL, ML = generate_cost_matrices(
-                        dag,  # Pass the actual graph, not len(task_list)
-                        num_proc, num_bus, self.ccr,
-                        random_state=42  # Add random state for reproducibility
-                    )
+                    
                     
                     # Test both algorithms
                     for algorithm in self.algorithms:
+                        
                         print(f"      Algorithm: {algorithm.upper()}")
                         
                         # Create scheduler with centralized parameters
                         # In run_experiment method:
-# Create scheduler with centralized parameters
+                        # Create scheduler with centralized parameters
                         if algorithm == Algorithms.QLCCTMS:
                             scheduler = SchedulerUtils.create_scheduler_with_params(algorithm, self.ql_params)
                         else:
@@ -159,6 +156,11 @@ class AbsoluteMakespanComparator:
                         # Run multiple iterations for statistical significance
                         iteration_results = []
                         for iteration in range(self.iterations):
+                            ET, CT, TL, ML = generate_cost_matrices(
+                                dag,  
+                                num_proc, num_bus, self.ccr,
+                                random_state=42 + iteration
+                            )
                             current_config += 1
                             
                             # Show progress
@@ -186,7 +188,7 @@ class AbsoluteMakespanComparator:
                                     'ccr': self.ccr,
                                     'num_tasks': len(task_list),
                                     'num_messages': len(message_list),
-                                    'execution_time': result.get('execution_time', 0),
+                                    'execution_time': result.get('execution_time', 0),  
                                     'timestamp': datetime.now().isoformat()
                                 }
                                 
@@ -808,7 +810,7 @@ def main():
     
     # Create experiment instance with reduced parameters for testing
     experiment = AbsoluteMakespanComparator(
-        results_dir="./results", 
+        results_dir="./results/new_experiment_small_test", 
         iterations=30  # Reduced iterations for quick testing
     )
     

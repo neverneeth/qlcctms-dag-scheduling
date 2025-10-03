@@ -13,7 +13,7 @@ Parameter Space:
 - epsilon: [0.05, 0.3] (exploration rate)
 - learning_rate: [0.05, 0.3] (learning rate alpha)
 - discount: [0.7, 0.9] (discount factor gamma)  
-- max_episodes: [1000, 50000] (maximum training episodes)
+- max_episodes: [1000, 10000] (maximum training episodes)
 - convergence_window: [10, 50] (convergence check window)
 - convergence_threshold: [0.01, 0.2] (convergence threshold)
 
@@ -89,7 +89,7 @@ class QLParameterOptimizer:
             'epsilon': [0.05, 0.3],
             'learning_rate': [0.05, 0.3],
             'discount': [0.7, 0.9],
-            'max_episodes': [1000, 50000],
+            'max_episodes': [1000, 10000],
             'convergence_window': [10, 50],
             'convergence_threshold': [0.01, 0.2]
         }

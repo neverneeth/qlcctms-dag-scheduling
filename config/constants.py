@@ -39,13 +39,21 @@ class Algorithms:
 
 
 # Q-Learning Default Parameters
-DEFAULT_QL_PARAMS = {
+"""DEFAULT_QL_PARAMS = {
     'epsilon': 0.2,                    # Exploration rate
     'learning_rate': 0.1,              # Learning rate (alpha)
     'discount': 0.8,                   # Discount factor (gamma)
     'max_episodes': 2000,              # Maximum episodes (reduced from 300,000)
     'convergence_window': 20,          # Window for convergence check (reduced from 40)
     'convergence_threshold': 0.5       # Convergence threshold (reduced from 0.2)
+}"""
+DEFAULT_QL_PARAMS = {
+  'epsilon': 0.05,
+  'learning_rate': 0.05,
+  'discount': 0.7,
+  'max_episodes': 8054,
+  'convergence_window': 10,
+  'convergence_threshold': 0.2
 }
 
 # Experiment Configuration
@@ -75,8 +83,8 @@ class ExperimentConfig:
     # Experiment settings
     FULL_ITERATIONS = 100                      # Iterations for statistical significance
     SMALL_ITERATIONS = 10                      # Iterations for quick testing
-    
-    CCR = 1.0                                  # Communication-to-Computation Ratio
+
+    CCR = [0.5, 1.0]                                  # Communication-to-Computation Ratio
 
 
 # Visualization Constants
